@@ -9,8 +9,11 @@ import DateTime
 data Calendar = Calendar
     deriving (Eq, Ord, Show)
 
-data Event = Event
-    deriving (Eq, Ord, Show)
+data Event = Event {eventProps :: [EventProp]}
+    deriving (Eq, Ord)
+
+data EventProp = DtStamp | Summary
+    deriving (Eq, Ord)
 
 -- Exercise 7
 data Token = Token
