@@ -127,7 +127,7 @@ checkDateTime :: DateTime -> Bool
 checkDateTime (DateTime date time utc) = checkDate date && checkTime time
 
 checkDate :: Date -> Bool
-checkDate (Date y m d) = checkYear y && checkMonth m && checkDay d
+checkDate (Date y m d) = checkYear y && checkMonth m && checkDay y m d
  
 checkYear :: Year -> Bool
 checkYear (Year y) = checkRange 1 4 $ length $ show y
@@ -136,36 +136,31 @@ checkMonth :: Month -> Bool
 checkMonth (Month m) = checkRange 1 12 m
 
 checkDay :: Year -> Month -> Day -> Bool
-checkDay year@(Year y) (Month m) (Day d)
-    = checkRange 1 28 d 
-   || elem m month_30 && d == 30
-   || elem m month_31 && d == 31
-   || Year `mod` 4 == 0
-    -- 30 
-    -- 31
+checkDay year@(Year y) month@(Month m) (Day d)
+    = checkRange 1 monthMax d
+    where
+        monthMax = monthMaxRange year month
+
+monthMaxRange :: Year -> Month -> Int
+monthMaxRange year month@(Month m)
+    | elem m month_30 = 30
+    | elem m month_31 = 31
+    | otherwise = februaryMaxRange year
     where
         month_30 = [4, 6, 9, 11]
         month_31 = [1, 3, 5, 7, 8, 10, 12]
 
-checkDay :: Year -> Month -> Day -> Bool
-checkDay (Year y) (Month m) (Day d)
-    = checkRange 1 28 d
-    -- 30 
-    -- 31
-    where
-        month_30 = [4, 6, 9, 11]
-        month_31 = [1, 3, 5, 7, 8, 10, 12]
+februaryMaxRange :: Year -> Int
+februaryMaxRange year@(Year y)
+    | isCentury year && isCenturyLeapYear year = 29
+    | y `mod` 4 == 0 && (not $ isCentury year) = 29
+    | otherwise = 28
 
-monthMaxRange :: Int -> Int
-monthMaxRange m | elem m month_30 = 30
-                | elem m month_31 = 31
-                | otherwise = 28
-    where
-        month_30 = [4, 6, 9, 11]
-        month_31 = [1, 3, 5, 7, 8, 10, 12]
+isCentury :: Year -> Bool
+isCentury (Year y) = y `mod` 100 == 0
 
-checkFebruary29 :: Year -> Bool
-checkFebruary29 (Year y) = 
+isCenturyLeapYear :: Year -> Bool
+isCenturyLeapYear (Year y) = y `mod` 400 == 0
 
 checkTime :: Time -> Bool
 checkTime (Time (Hour h) (Minute m) (Second s))
@@ -175,3 +170,5 @@ checkTime (Time (Hour h) (Minute m) (Second s))
 
 checkRange :: Int -> Int -> Int -> Bool
 checkRange min max value = value >= min && value <= max
+
+parseCheck s = checkDateTime <$> run parseDateTime s
