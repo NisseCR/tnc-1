@@ -6,13 +6,24 @@ import DateTime
 
 
 -- Exercise 6
-data Calendar = Calendar
-    deriving (Eq, Ord, Show)
+data Calendar = Calendar {events :: [Event]
+                         , calProps :: [CalProp]}
+    deriving (Eq, Ord)
+
+data CalProp = ProdId {prodId :: String}
+             | Version {version :: Float }
+    deriving (Eq, Ord)
 
 data Event = Event {eventProps :: [EventProp]}
     deriving (Eq, Ord)
 
-data EventProp = DtStamp | Summary
+data EventProp = DtStamp {dtStamp :: DateTime} 
+               | Uid {uid :: String}
+               | DtStart {dtStart :: DateTime}
+               | DtEnd {dtEnd :: DateTime}
+               | Description {description :: String}
+               | Summary {summary :: String}
+               | Location {location :: String}
     deriving (Eq, Ord)
 
 -- Exercise 7
@@ -31,3 +42,6 @@ recognizeCalendar s = run scanCalendar s >>= run parseCalendar
 -- Exercise 8
 printCalendar :: Calendar -> String
 printCalendar = undefined
+
+
+--pack function parser a to parser b to parser c for 7
