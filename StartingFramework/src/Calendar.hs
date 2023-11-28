@@ -27,8 +27,13 @@ data EventProp = DtStamp {dtStamp :: DateTime}
     deriving (Eq, Ord)
 
 -- Exercise 7
-data Token = Token
+data Token = TokenCalendarPrefix
+           | TokenCalendarProp
     deriving (Eq, Ord, Show)
+
+-- parseText = parseToken <<|> parseContText
+
+-- parseToken = parsePrefix * ... * satisfy notSpace symbol
 
 scanCalendar :: Parser Char [Token]
 scanCalendar = undefined
