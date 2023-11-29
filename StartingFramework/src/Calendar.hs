@@ -95,7 +95,7 @@ assignTextToken "VERSION:" result = [TokenVersion, TokenText result, TokenCrlf]
 parseText :: Parser Char String
 parseText = f <$> parseLines <*> parseLine
     where
-        f ls l = intercalate " " ls ++ " " ++ l
+        f ls l = tail $ intercalate " " ls ++ " " ++ l
 
 parseLines :: Parser Char [String]
 parseLines = greedy $ parseLine <* parseBreak
@@ -134,7 +134,7 @@ parseEventProp = DtStamp <$> pack (symbol TokenDtStamp) (tdatetime) (symbol Toke
               <|> Summary <$> pack (symbol TokenSummary) (ttext) (symbol TokenCrlf)
               <|> Location <$> pack (symbol TokenLocation) (ttext) (symbol TokenCrlf)
 
-ttext :: Parser Token String
+ttext :: Parser Token String -- TODO dafuq is this even
 ttext = anySymbol >>= isTText
   where
     isTText :: Token -> Parser Token String
@@ -142,7 +142,7 @@ ttext = anySymbol >>= isTText
     isTText _ = empty
 
 
-tdatetime :: Parser Token DateTime
+tdatetime :: Parser Token DateTime -- TODO dafuq is this even 2
 tdatetime = anySymbol >>= isTDateTime
   where
     isTDateTime :: Token -> Parser Token DateTime
@@ -152,9 +152,53 @@ tdatetime = anySymbol >>= isTDateTime
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
 
+example :: String
+example = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\r\nBEGIN:VEVENT\r\nUID:19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY:Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+
+exomple :: String
+exomple = "BEGIN:VCALENDAR\r\nVERSION: 2.0\r\nPRODID: -//hacksw/handcal//NONSGML v1.0//E\r\nN\r\nBEGIN:VEVENT\r\nUID: 19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY: Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+
+debug :: String
+debug = printCalendar cal
+    where
+        (Just cal) = recognizeCalendar example
+
 -- Exercise 8
 printCalendar :: Calendar -> String
-printCalendar = undefined
+printCalendar (Calendar props events) = "BEGIN:VCALENDAR\r\n"
+                                        ++ printCalProps 
+                                        ++ printEvents
+                                        ++ "END:VCALENDAR\r\n"
+    where 
+        printCalProps = concat $ map printCalProp props
+        printEvents = concat $ map printEvent events
+
+printCalProp :: CalProp -> String
+printCalProp (ProdId c) = (printText $ "PRODID:" ++ c) ++ "\r\n"
+printCalProp (Version c) = (printText $ "VERSION:" ++ c) ++ "\r\n"
+
+printEvent :: Event -> String
+printEvent (Event props) = "BEGIN:VEVENT\r\n" 
+                            ++ (concat $ map printEventProp props)
+                            ++ "END:VEVENT\r\n"
+
+printEventProp :: EventProp -> String
+printEventProp (DtStamp c) = "DTSTAMP:" ++ printDateTime c ++ "\r\n"
+printEventProp (Uid c) = (printText $ "UID:" ++ c) ++ "\r\n" 
+printEventProp (DtStart c) = "DTSTART:" ++ printDateTime c ++ "\r\n"
+printEventProp (DtEnd c) = "DTEND:" ++ printDateTime c ++ "\r\n"
+printEventProp (Description c) = (printText $ "DESCRIPTION:" ++ c) ++ "\r\n"
+printEventProp (Summary c) = (printText $ "SUMMARY:" ++ c) ++ "\r\n"
+printEventProp (Location c) = (printText $ "LOCATION:" ++ c) ++ "\r\n"
+
+-- Ensure line length does not exceed 42 characters.
+printText :: String -> String
+printText line = printText' line [] 0
+
+printText' :: String -> String -> Int -> String
+printText' [] buffer _ = buffer
+printText' text buffer 42 = buffer ++ "\r\n" ++ printText' text [] 0
+printText' (x:xs) buffer bufferLength = printText' xs (buffer ++ [x]) (bufferLength + 1)
 
 
 --pack function parser a to parser b to parser c for 7
