@@ -152,16 +152,16 @@ tdatetime = anySymbol >>= isTDateTime
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
 
-example :: String
-example = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\r\nBEGIN:VEVENT\r\nUID:19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY:Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+-- example :: String
+-- example = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\r\nBEGIN:VEVENT\r\nUID:19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY:Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
 
-exomple :: String
-exomple = "BEGIN:VCALENDAR\r\nVERSION: 2.0\r\nPRODID: -//hacksw/handcal//NONSGML v1.0//E\r\nN\r\nBEGIN:VEVENT\r\nUID: 19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY: Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+-- exomple :: String
+-- exomple = "BEGIN:VCALENDAR\r\nVERSION: 2.0\r\nPRODID: -//hacksw/handcal//NONSGML v1.0//E\r\nN\r\nBEGIN:VEVENT\r\nUID: 19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY: Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
 
-debug :: String
-debug = printCalendar cal
-    where
-        (Just cal) = recognizeCalendar example
+-- debug :: String
+-- debug = printCalendar cal
+--     where
+--         (Just cal) = recognizeCalendar example
 
 -- Exercise 8
 printCalendar :: Calendar -> String
@@ -200,5 +200,37 @@ printText' [] buffer _ = buffer
 printText' text buffer 42 = buffer ++ "\r\n" ++ printText' text [] 0
 printText' (x:xs) buffer bufferLength = printText' xs (buffer ++ [x]) (bufferLength + 1)
 
+---------------------------------------------------------------------------------------------------------
 
---pack function parser a to parser b to parser c for 7
+--9.1 
+eventCount :: Calendar -> Int
+eventCount calendar = length (events calendar)
+
+--9.2
+eventExists :: Calendar -> DateTime -> Bool
+eventExists calendar dateTime = True `elem` (map $ dateTimeInRange dateTime $ getEventDates calendar) -- please help me, I am under the water and I can't find the mistake ... 
+
+dateTimeInRange :: DateTime -> (DateTime, DateTime) -> Bool
+dateTimeInRange dateTimeComp (dateTimeStart, dateTimeEnd) =
+    dateStart <= dateComp &&
+    dateEnd >= dateComp -- && nog meer checks om te kijken of de dateTime voldoet ...
+    where
+        dateStart = date dateTimeStart
+        timeStart = time dateTimeStart
+        dateEnd = date dateTimeEnd
+        timeEnd = time dateTimeEnd
+        dateComp = date dateTimeComp
+        timeComp = time dateTimeComp
+
+-- Geeft voor alle events een tuple met begin- en einddatum
+getEventDates :: Calendar -> [(DateTime, DateTime)] 
+getEventDates calendar = map f allEvents 
+    where 
+        f :: Event -> (DateTime, DateTime)
+        f event = (DtStart eventProps event, DtEnd eventProps event) -- eventProps heeft geen properties, dus hoe vragen we DtStart/DtEnd op?
+        allEvents = events calendar
+
+-- Het lastige is "hoe vraag je specifieke eventProps op". De vragen zijn,
+-- als dit lukt, gemakkelijk te implementeren. Vgm met pattern matchen op 
+-- de EventProp. 
+-- Veel succes nog Nisse!
