@@ -43,12 +43,13 @@ data Token = TokenText String
            | TokenCrlf
     deriving (Eq, Ord, Show)
 
+-- Create sets of 3 tokens (start, content, end) for each element in the grammar.
 scanCalendar :: Parser Char [Token]
 scanCalendar =  concat <$> greedy (scanToken <* scanTokenBreak)
+    where
+        scanTokenBreak = token "\r\n" -- w/o spaces
 
-scanTokenBreak :: Parser Char [Token]
-scanTokenBreak = const [TokenCrlf] <$> token "\r\n"
-
+-- Match token parser based on grammar prefix (e.g. DTSTAMP:).
 scanToken :: Parser Char [Token]
 scanToken = scanWrapper "BEGIN:VCALENDAR"
          <|> scanWrapper "END:VCALENDAR"
@@ -63,26 +64,23 @@ scanToken = scanWrapper "BEGIN:VCALENDAR"
          <|> scanTextToken "LOCATION:"
          <|> scanTextToken "VERSION:"
          <|> scanTextToken "PRODID:"
-            
+
+-- Simply return TokenWrapper, since this token does not contain data.            
 scanWrapper :: String -> Parser Char [Token]
 scanWrapper prefix = const [TokenWrapper] <$> token prefix 
 
--- Datetime tokens
+-- == DateTime tokens ==
 scanDateTimeToken :: String -> Parser Char [Token]
-scanDateTimeToken prefix = f <$> token prefix <*> parseDateTime
-    where
-        f _ datetime = assignDateTimeToken prefix datetime
+scanDateTimeToken prefix = assignDateTimeToken prefix <$> (token prefix *> parseDateTime)
 
 assignDateTimeToken :: String -> DateTime -> [Token]
 assignDateTimeToken "DTSTAMP:" result = [TokenDtStamp, TokenDateTime result, TokenCrlf]
 assignDateTimeToken "DTSTART:" result = [TokenDtStart, TokenDateTime result, TokenCrlf]
 assignDateTimeToken "DTEND:" result = [TokenDtEnd, TokenDateTime result, TokenCrlf]
 
--- Text tokens
+-- == Text tokens ==
 scanTextToken :: String -> Parser Char [Token]
-scanTextToken prefix = f <$> token prefix <*> parseText
-    where
-        f _ text = assignTextToken prefix text
+scanTextToken prefix = assignTextToken prefix <$> (token prefix *> parseText)
 
 assignTextToken :: String -> String -> [Token]
 assignTextToken "UID:" result = [TokenUid, TokenText result, TokenCrlf]
@@ -92,38 +90,39 @@ assignTextToken "LOCATION:" result = [TokenLocation, TokenText result, TokenCrlf
 assignTextToken "PRODID:" result = [TokenProdId, TokenText result, TokenCrlf]
 assignTextToken "VERSION:" result = [TokenVersion, TokenText result, TokenCrlf]
 
+-- == Parsing of multiline text ==
+-- Parse text including newlines that are *not* a delimiter for a token. This function parses until a crlf w/o space.
 parseText :: Parser Char String
 parseText = f <$> parseLines <*> parseLine
     where
         f ls l = tail $ intercalate " " ls ++ " " ++ l
 
+-- Parse lines ending with crlf w/ space.
 parseLines :: Parser Char [String]
 parseLines = greedy $ parseLine <* parseBreak
+    where
+        parseBreak = token "\r\n "
 
+-- Parse single line *until* crlf w/o space.
 parseLine :: Parser Char String
 parseLine = greedy $ satisfy (\c -> c /= '\r')
 
-parseBreak :: Parser Char String
-parseBreak = token "\r\n "
 
+-- == Calendar parsing ==
 parseCalendar :: Parser Token Calendar
---parseCalendar = f <$> (symbol TokenWrapper *> many parseCalendarProps) <*> many parseEvents <* symbol TokenWrapper 
-parseCalendar = pack (symbol TokenWrapper) parseCalendarContent (symbol TokenWrapper) 
-
-parseCalendarContent ::  Parser Token Calendar
-parseCalendarContent = f <$> many parseCalendarProp <*> many parseEvent
+parseCalendar = pack (symbol TokenWrapper) parseCalendarContent (symbol TokenWrapper)
     where
-        f props events = Calendar props events
+        parseCalendarContent = Calendar <$> many parseCalendarProp <*> many parseEvent
     
 parseCalendarProp :: Parser Token CalProp
 parseCalendarProp = ProdId <$> pack (symbol TokenProdId) (ttext) (symbol TokenCrlf)
                  <|> Version <$> pack (symbol TokenVersion) (ttext) (symbol TokenCrlf)
 
+-- == Event parsing ==
 parseEvent :: Parser Token Event
 parseEvent = pack (symbol TokenWrapper) parseEventContent (symbol TokenWrapper) 
-
-parseEventContent ::  Parser Token Event
-parseEventContent = Event <$> many parseEventProp
+    where
+        parseEventContent = Event <$> many parseEventProp
 
 parseEventProp :: Parser Token EventProp
 parseEventProp = DtStamp <$> pack (symbol TokenDtStamp) (tdatetime) (symbol TokenCrlf)
@@ -151,17 +150,6 @@ tdatetime = anySymbol >>= isTDateTime
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
-
-example :: String
-example = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\r\nBEGIN:VEVENT\r\nUID:19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY:Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
-
-exomple :: String
-exomple = "BEGIN:VCALENDAR\r\nVERSION: 2.0\r\nPRODID: -//hacksw/handcal//NONSGML v1.0//E\r\nN\r\nBEGIN:VEVENT\r\nUID: 19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY: Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
-
-debug :: String
-debug = printCalendar cal
-    where
-        (Just cal) = recognizeCalendar example
 
 -- Exercise 8
 printCalendar :: Calendar -> String
@@ -201,4 +189,11 @@ printText' text buffer 42 = buffer ++ "\r\n" ++ printText' text [] 0
 printText' (x:xs) buffer bufferLength = printText' xs (buffer ++ [x]) (bufferLength + 1)
 
 
---pack function parser a to parser b to parser c for 7
+-- DEBUG
+example :: String
+example = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\r\nBEGIN:VEVENT\r\nUID:19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY:Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+
+debug :: Maybe Calendar
+debug = recognizeCalendar $ printCalendar cal
+    where
+        (Just cal) = recognizeCalendar example
