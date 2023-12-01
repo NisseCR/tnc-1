@@ -248,5 +248,9 @@ cal1 = cal
 ev1 :: Event
 ev1 = events cal1 !! 0
 
+dt1 = fst x
+    where
+        (x:xs) = parse parseDateTime "19970610T172345Z"
+
 
         
