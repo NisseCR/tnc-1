@@ -115,8 +115,8 @@ parseCalendar = pack (symbol TokenWrapper) parseCalendarContent (symbol TokenWra
         parseCalendarContent = Calendar <$> many parseCalendarProp <*> many parseEvent
     
 parseCalendarProp :: Parser Token CalProp
-parseCalendarProp = ProdId <$> pack (symbol TokenProdId) (ttext) (symbol TokenCrlf)
-                 <|> Version <$> pack (symbol TokenVersion) (ttext) (symbol TokenCrlf)
+parseCalendarProp = ProdId <$> pack (symbol TokenProdId) (parseTextToken) (symbol TokenCrlf)
+                 <|> Version <$> pack (symbol TokenVersion) (parseTextToken) (symbol TokenCrlf)
 
 -- == Event parsing ==
 parseEvent :: Parser Token Event
@@ -125,28 +125,28 @@ parseEvent = pack (symbol TokenWrapper) parseEventContent (symbol TokenWrapper)
         parseEventContent = Event <$> many parseEventProp
 
 parseEventProp :: Parser Token EventProp
-parseEventProp = DtStamp <$> pack (symbol TokenDtStamp) (tdatetime) (symbol TokenCrlf)
-              <|> Uid <$> pack (symbol TokenUid) (ttext) (symbol TokenCrlf)
-              <|> DtStart <$> pack (symbol TokenDtStart) (tdatetime) (symbol TokenCrlf)
-              <|> DtEnd <$> pack (symbol TokenDtEnd) (tdatetime) (symbol TokenCrlf)
-              <|> Description <$> pack (symbol TokenDescription) (ttext) (symbol TokenCrlf)
-              <|> Summary <$> pack (symbol TokenSummary) (ttext) (symbol TokenCrlf)
-              <|> Location <$> pack (symbol TokenLocation) (ttext) (symbol TokenCrlf)
+parseEventProp = DtStamp <$> pack (symbol TokenDtStamp) (parseDateTimeToken) (symbol TokenCrlf)
+              <|> Uid <$> pack (symbol TokenUid) (parseTextToken) (symbol TokenCrlf)
+              <|> DtStart <$> pack (symbol TokenDtStart) (parseDateTimeToken) (symbol TokenCrlf)
+              <|> DtEnd <$> pack (symbol TokenDtEnd) (parseDateTimeToken) (symbol TokenCrlf)
+              <|> Description <$> pack (symbol TokenDescription) (parseTextToken) (symbol TokenCrlf)
+              <|> Summary <$> pack (symbol TokenSummary) (parseTextToken) (symbol TokenCrlf)
+              <|> Location <$> pack (symbol TokenLocation) (parseTextToken) (symbol TokenCrlf)
 
-ttext :: Parser Token String -- TODO dafuq is this even
-ttext = anySymbol >>= isTText
-  where
-    isTText :: Token -> Parser Token String
-    isTText (TokenText t) = succeed t
-    isTText _ = empty
+-- == Extract data from token ==
+-- https://ics.uu.nl/docs/vakken/b3tc/downloads-2018/monadExamples.hs
+parseTextToken :: Parser Token String
+parseTextToken = anySymbol >>= f
+    where
+        f (TokenText t) = succeed t
+        f _ = empty
 
 
-tdatetime :: Parser Token DateTime -- TODO dafuq is this even 2
-tdatetime = anySymbol >>= isTDateTime
-  where
-    isTDateTime :: Token -> Parser Token DateTime
-    isTDateTime (TokenDateTime dt) = succeed dt
-    isTDateTime _ = empty
+parseDateTimeToken :: Parser Token DateTime
+parseDateTimeToken = anySymbol >>= f
+    where
+        f (TokenDateTime dt) = succeed dt
+        f _ = empty
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
