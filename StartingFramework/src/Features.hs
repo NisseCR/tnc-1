@@ -7,7 +7,7 @@ import Text.PrettyPrint.Boxes
 
 -- Exercise 9
 countEvents :: Calendar -> Int
-countEvents = undefined
+countEvents calendar = length $ events calendar
 
 findEvents :: DateTime -> Calendar -> [Event]
 findEvents = undefined

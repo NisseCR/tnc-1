@@ -2,6 +2,7 @@ module Calendar where
 
 import ParseLib.Abstract
 import Data.List
+import qualified Data.Set as Set
 import Prelude hiding ((<$), ($>), (<*), (*>), sequence)
 import DateTime
 
@@ -112,17 +113,30 @@ parseLine = greedy $ satisfy (\c -> c /= '\r')
 parseCalendar :: Parser Token Calendar
 parseCalendar = pack (symbol TokenWrapper) parseCalendarContent (symbol TokenWrapper)
     where
-        parseCalendarContent = Calendar <$> many parseCalendarProp <*> many parseEvent
+        parseCalendarContent = Calendar <$> many parseCalendarProp <*> many parseEvent >>= checkCalendar
     
 parseCalendarProp :: Parser Token CalProp
 parseCalendarProp = ProdId <$> pack (symbol TokenProdId) (parseTextToken) (symbol TokenCrlf)
                  <|> Version <$> pack (symbol TokenVersion) (parseTextToken) (symbol TokenCrlf)
 
+-- == Check calendar ==
+checkCalendar :: Calendar -> Parser Token Calendar
+checkCalendar calendar = if (abideOccurence && abideRequired) then succeed calendar else empty
+    where
+        props = map bindCalendarProp $ calProps calendar
+        abideOccurence = checkOccurence props
+        abideRequired = checkRequired props [TokenProdId, TokenVersion]
+        
+-- Bind properties back to tokens, to allow creation of sets by ignoring contained data.
+bindCalendarProp :: CalProp -> Token
+bindCalendarProp (ProdId _) = TokenProdId
+bindCalendarProp (Version _) = TokenVersion
+
 -- == Event parsing ==
 parseEvent :: Parser Token Event
 parseEvent = pack (symbol TokenWrapper) parseEventContent (symbol TokenWrapper) 
     where
-        parseEventContent = Event <$> many parseEventProp
+        parseEventContent = Event <$> many parseEventProp >>= checkEvent
 
 parseEventProp :: Parser Token EventProp
 parseEventProp = DtStamp <$> pack (symbol TokenDtStamp) (parseDateTimeToken) (symbol TokenCrlf)
@@ -148,6 +162,34 @@ parseDateTimeToken = anySymbol >>= f
         f (TokenDateTime dt) = succeed dt
         f _ = empty
 
+-- == Check event ==
+checkEvent :: Event -> Parser Token Event
+checkEvent event = if (abideOccurence && abideRequired) then succeed event else empty
+    where
+        props = map bindEventProp $ eventProps event
+        abideOccurence = checkOccurence props
+        abideRequired = checkRequired props [TokenDtStamp, TokenUid, TokenDtStart, TokenDtEnd]
+        
+-- Bind properties back to tokens, to allow creation of sets by ignoring contained data.
+bindEventProp :: EventProp -> Token
+bindEventProp (DtStamp _) = TokenDtStamp
+bindEventProp (Uid _) = TokenUid
+bindEventProp (DtStart _) = TokenDtStart
+bindEventProp (DtEnd _) = TokenDtEnd
+bindEventProp (Description _) = TokenDescription
+bindEventProp (Summary _) = TokenSummary
+bindEventProp (Location _) = TokenLocation
+
+-- == Global validate functions ==
+-- Check whether property does not occur more than once.
+checkOccurence :: [Token] -> Bool
+checkOccurence tks = length tks == (length $ Set.fromList tks)
+
+-- Check whether required properties are present.
+checkRequired :: [Token] -> [Token] -> Bool
+checkRequired tks required = intersect required tks == required
+
+-- == Main function ==
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
 
@@ -189,11 +231,22 @@ printText' text buffer 42 = buffer ++ "\r\n" ++ printText' text [] 0
 printText' (x:xs) buffer bufferLength = printText' xs (buffer ++ [x]) (bufferLength + 1)
 
 
--- DEBUG
+-- == DEBUG ==
 example :: String
 example = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\r\nBEGIN:VEVENT\r\nUID:19970610T172345Z-AF23B2@example.com\r\nDTSTAMP:19970610T172345Z\r\nDTSTART:19970714T170000Z\r\nDTEND:19970715T040000Z\r\nSUMMARY:Bastille Day Party\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
 
 debug :: Maybe Calendar
-debug = recognizeCalendar $ printCalendar cal
+debug = recognizeCalendar $ printCalendar calen
+    where
+        (Just calen) = recognizeCalendar example
+
+cal1 :: Calendar
+cal1 = cal
     where
         (Just cal) = recognizeCalendar example
+
+ev1 :: Event
+ev1 = events cal1 !! 0
+
+
+        
